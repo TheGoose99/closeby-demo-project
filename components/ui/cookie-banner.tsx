@@ -2,32 +2,44 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { ClientConfig } from '@/types/client-config'
+import { clearCookieConsent, getCookieConsent, setCookieConsent, notifyCookieConsentChanged } from '@/lib/cookie-consent'
 
 export function CookieBanner({ config }: { config: Pick<ClientConfig, 'gdpr'> }) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const consent = localStorage.getItem('cookie_consent')
+    const consent = getCookieConsent()
     if (!consent) {
       const t = setTimeout(() => setVisible(true), 2500)
       return () => clearTimeout(t)
     }
   }, [])
 
+  useEffect(() => {
+    const onReset = () => {
+      clearCookieConsent()
+      setVisible(true)
+    }
+    window.addEventListener('cookie-consent-reset', onReset as EventListener)
+    return () => window.removeEventListener('cookie-consent-reset', onReset as EventListener)
+  }, [])
+
   const handleAccept = () => {
-    localStorage.setItem('cookie_consent', 'accepted')
+    setCookieConsent('accepted')
+    notifyCookieConsentChanged('accepted')
     setVisible(false)
   }
 
   const handleDecline = () => {
-    localStorage.setItem('cookie_consent', 'declined')
+    setCookieConsent('declined')
+    notifyCookieConsentChanged('declined')
     setVisible(false)
   }
 
   if (!visible) return null
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 max-w-2xl mx-auto bg-ink text-white/80 rounded-xl p-4 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center gap-4 animate-fade-up">
+    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom)+5.5rem)] sm:bottom-4 left-4 right-4 z-50 max-w-2xl mx-auto bg-ink text-white/80 rounded-xl p-4 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center gap-4 animate-fade-up">
       <p className="text-sm leading-relaxed flex-1">
         Folosim cookie-uri esențiale pentru funcționarea site-ului.{' '}
         <Link href={config.gdpr.privacyPolicyUrl} className="text-sage underline">

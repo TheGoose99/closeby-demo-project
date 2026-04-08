@@ -40,7 +40,7 @@ export function ReviewsSection({ config }: { config: ClientConfig }) {
                   review.highlight ? 'text-white/90' : 'text-ink-m'
                 )}
               >
-                „{review.text}"
+                „{review.text}”
               </blockquote>
 
               <div className="flex items-center gap-3">

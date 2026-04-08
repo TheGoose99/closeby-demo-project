@@ -60,7 +60,7 @@ export function AboutSection({ config }: { config: ClientConfig }) {
             <div className="border-l-[3px] border-sage-d pl-5 mb-6">
               <p className="font-serif text-xl italic text-sage-d leading-relaxed">
                 „Cred că fiecare persoană are în ea resursele necesare pentru schimbare.
-                Rolul meu este să te ajut să le descoperi."
+                Rolul meu este să te ajut să le descoperi.”
               </p>
             </div>
 

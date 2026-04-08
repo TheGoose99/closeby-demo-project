@@ -1,13 +1,10 @@
 import Image from 'next/image'
 import type { ClientConfig } from '@/types/client-config'
-import { buildWhatsAppUrl } from '@/lib/utils'
+
+const FALLBACK_BLUR_DATA_URL =
+  'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA='
 
 export function HeroSection({ config }: { config: ClientConfig }) {
-  const waUrl = buildWhatsAppUrl(
-    config.integrations.whatsappNumber ?? '',
-    config.integrations.whatsappMessage
-  )
-
   return (
     <section className="min-h-svh pt-16 pb-0 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center max-w-[1200px] mx-auto px-6 lg:px-10">
       {/* Text side */}
@@ -72,7 +69,10 @@ export function HeroSection({ config }: { config: ClientConfig }) {
                 alt={`Dr. ${config.shortName} — psihoterapeut ${config.address.sector} ${config.address.city}`}
                 fill
                 priority
-                sizes="(max-width: 768px) 80vw, 40vw"
+                quality={80}
+                sizes="(max-width: 768px) 80vw, (max-width: 1024px) 50vw, 384px"
+                placeholder="blur"
+                blurDataURL={FALLBACK_BLUR_DATA_URL}
                 className="object-cover"
               />
             ) : (

@@ -1,13 +1,13 @@
 # CloseBy Demo — Cabinet Psihoterapie
 
-Site Next.js 14 complet funcțional pentru cabinet de psihologie / psihoterapie din București.
+Site Next.js 15 complet funcțional pentru cabinet de psihologie / psihoterapie din București.
 Construit ca demo pentru pitchuri comerciale CloseBy Studio.
 
 ## Stack
 
 | Layer | Tehnologie |
 |-------|-----------|
-| Framework | Next.js 14 (App Router, TypeScript strict) |
+| Framework | Next.js 15 (App Router, TypeScript strict) |
 | Styling | Tailwind CSS cu design tokens custom |
 | Booking | Cal.com EU embed (`@calcom/embed-react`) |
 | Email | Resend API (confirmare, reminder 24h, review request) |
@@ -54,7 +54,8 @@ closeby-demo/
 ```bash
 git clone <repo> closeby-demo
 cd closeby-demo
-npm install
+# @calcom/embed-react are peer deps sensibile pe React 18
+npm install --legacy-peer-deps
 ```
 
 ### 2. Configurează variabilele de mediu
@@ -96,6 +97,25 @@ vercel --prod
 4. Copiază webhook secret în `CAL_WEBHOOK_SECRET`
 5. Actualizează `calComUsername` în `config/clients/[client].ts`
 
+## Local dev (webhook public via ngrok)
+
+Pentru a testa webhooks Cal.com local, ai nevoie de un URL public către `localhost:3000`.
+
+1. Rulează Next local:
+
+```bash
+npm run dev
+```
+
+2. Pornește ngrok pentru portul 3000 (îți va da un URL public de forma `https://<id>.ngrok-free.app`).
+3. Setează în `.env.local`:
+   - `NEXT_PUBLIC_SITE_URL=https://<id>.ngrok-free.app`
+   - `CAL_WEBHOOK_SECRET=<secretul webhook-ului din Cal.com>` (același secret pe care îl afișează Cal.com pentru webhook)
+4. În Cal.com → Settings → Developer → Webhooks, setează URL-ul webhook la:
+   - `https://<id>.ngrok-free.app/api/webhooks/cal`
+
+Notă: URL-ul ngrok se schimbă. Când se schimbă, actualizezi și `NEXT_PUBLIC_SITE_URL`, și URL-ul webhook din Cal.com.
+
 ## Resend Setup
 
 1. Creează cont pe **resend.com**
@@ -123,6 +143,28 @@ Nu necesită billing activat. Generezi URL-ul de embed din Google Maps:
 - [ ] Setezi domeniu custom în Vercel
 - [ ] Testezi booking end-to-end + emailuri
 
+## Development model (template per client)
+
+- **Per-client deploy**: un proiect Vercel per client, același repo, `CLIENT_SLUG` diferit.
+- **Config-driven**: nu hardcodezi texte/prețuri în componente; totul stă în `config/clients/[slug].ts`, iar `config/client.ts` selectează config-ul la runtime.
+- **Faze**:
+  - **Faza 1 (0–3 clienți)**: fără DB/auth/dashboard/state global; Cal.com stochează programările.
+  - **Faza 2 (scalare, fiabilitate)**: job scheduling pentru emailuri (ex. queue) în loc de `setTimeout` în webhook.
+
+## Known constraints (important înainte de producție)
+
+- **Serverless timers**: `setTimeout()` în `app/api/webhooks/cal/route.ts` nu e fiabil pe Vercel (funcțiile pot fi oprite/restartate). Pentru clienți reali folosești **queue/job scheduling** (ex. QStash) pentru reminder + review request.
+
+## Testing / TDD workflow
+
+Pentru task-uri **medium/high** sau cu impact pe business (booking/email/webhooks/SEO/config model/critical path UI), folosim **TDD**:
+
+- Scrii/actualizezi **unit tests** înainte (sau în același PR) pentru comportamentul dorit.
+- Implementarea e “Done” doar când:
+  - `npx tsc --noEmit` trece
+  - `npm run lint` trece
+  - testele trec (unit tests)
+
 ## Performance țintă
 
 | Metric | Țintă |
@@ -132,6 +174,37 @@ Nu necesită billing activat. Generezi URL-ul de embed din Google Maps:
 | CLS | 0 |
 | INP | < 200ms |
 | mail-tester.com | ≥ 9/10 |
+
+## Beta build checklist (CDP-320)
+
+Rulezi checklist-ul ăsta înainte de “final beta build” pe fiecare client.
+
+### Build + quality gates
+
+- [ ] `npm run build`
+- [ ] `npm test`
+- [ ] `npx tsc --noEmit`
+- [ ] `npm run lint`
+
+### Env sanity (Vercel + local)
+
+- [ ] `CLIENT_SLUG` set corect
+- [ ] `NEXT_PUBLIC_SITE_URL` este URL public real (domeniu sau ngrok la dev)
+- [ ] `CAL_WEBHOOK_SECRET` corespunde webhook-ului din Cal.com
+- [ ] `RESEND_API_KEY` set + domeniu verificat în Resend (SPF/DKIM/DMARC)
+- [ ] (Prod) `QSTASH_TOKEN` + `QSTASH_FORWARD_SECRET` set pentru scheduling fiabil
+
+### Cal.com (EU) end-to-end
+
+- [ ] Creezi programare reală în Cal.com → confirmi că webhook-ul ajunge la `/api/webhooks/cal` (200 OK)
+- [ ] Email “confirmare programare” ajunge la attendee
+- [ ] (Prod cu QStash) verifici că se programează job-urile pentru reminder + review request
+- [ ] Job routes (`/api/jobs/send-reminder`, `/api/jobs/send-review-request`) resping cereri fără `Authorization` când `QSTASH_FORWARD_SECRET` e set
+
+### Resend deliverability
+
+- [ ] `RESEND_FROM` (dacă e set) este un sender valid pentru domeniul verificat
+- [ ] Test pe [mail-tester.com](https://www.mail-tester.com/) (scor țintă ≥ 9/10)
 
 ## GDPR
 

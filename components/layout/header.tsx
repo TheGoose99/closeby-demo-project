@@ -22,6 +22,15 @@ export function Header({ config }: { config: Pick<ClientConfig, 'shortName' | 'p
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  useEffect(() => {
+    if (!menuOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [menuOpen])
+
   const [first, ...rest] = config.shortName.split(' ')
 
   return (
@@ -32,9 +41,9 @@ export function Header({ config }: { config: Pick<ClientConfig, 'shortName' | 'p
         scrolled && 'shadow-[0_2px_20px_rgba(26,32,24,0.08)]'
       )}
     >
-      <nav className="max-w-[1200px] mx-auto px-5vw flex items-center justify-between h-16 px-6 lg:px-10">
+      <nav className="max-w-[1200px] mx-auto flex items-center justify-between h-16 px-6 lg:px-10">
         {/* Logo */}
-        <Link href="/" className="font-serif text-xl font-semibold text-ink tracking-tight">
+        <Link href="/" className="font-serif text-xl font-semibold text-ink tracking-tight truncate max-w-[60vw]">
           {first} <span className="text-sage-d">{rest.join(' ')}</span>
         </Link>
 

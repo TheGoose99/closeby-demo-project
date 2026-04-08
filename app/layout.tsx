@@ -6,6 +6,22 @@ import { Footer } from '@/components/layout/footer'
 import { MobileBar } from '@/components/layout/mobile-bar'
 import { CookieBanner } from '@/components/ui/cookie-banner'
 import { SchemaLocalBusiness, SchemaPerson, SchemaWebSite } from '@/components/seo/schema'
+import { Cormorant_Garamond, DM_Sans } from 'next/font/google'
+
+const fontSerif = Cormorant_Garamond({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  style: ['normal', 'italic'],
+  variable: '--font-serif',
+  display: 'swap',
+})
+
+const fontSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-sans',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: {
@@ -51,18 +67,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ro">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap"
-          rel="stylesheet"
-        />
         {/* Schema.org sitewide */}
         <SchemaLocalBusiness config={clientConfig} />
         <SchemaPerson config={clientConfig} />
         <SchemaWebSite config={clientConfig} />
       </head>
-      <body className="font-sans bg-cream text-ink antialiased">
+      <body className={`${fontSerif.variable} ${fontSans.variable} font-sans bg-cream text-ink antialiased pb-24 md:pb-0`}>
         <Header config={clientConfig} />
         <main>{children}</main>
         <Footer config={clientConfig} />

@@ -1,29 +1,53 @@
 'use client'
-import { useState } from 'react'
-import Cal, { getCalApi } from '@calcom/embed-react'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import type { ClientConfig } from '@/types/client-config'
-import { buildWhatsAppUrl, buildCalComUrl } from '@/lib/utils'
+import { buildWhatsAppUrl } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { buildBookingOptions } from '@/lib/booking-options'
 
 type EventSlugKey = 'initial' | 'session' | 'couple'
 
-const EVENT_OPTIONS: { key: EventSlugKey; label: string; note: string; icon: string }[] = [
-  { key: 'initial', label: 'Consultație inițială (gratuită)', note: '15 min · Fără cost', icon: '🌱' },
-  { key: 'session', label: 'Ședință individuală',            note: '30 min · 280 RON',   icon: '🧠' },
-  { key: 'couple',  label: 'Terapie de cuplu',               note: '30 min · 390 RON',   icon: '💑' },
-]
+const CalEmbed = dynamic(async () => {
+  const mod = await import('@calcom/embed-react')
+  return mod.default
+}, { ssr: false })
 
 export function BookingSection({ config }: { config: ClientConfig }) {
   const [selected, setSelected] = useState<EventSlugKey>('initial')
   const [calReady, setCalReady] = useState(false)
+  const [calVisible, setCalVisible] = useState(false)
+  const calContainerRef = useRef<HTMLDivElement | null>(null)
 
   const { calComUsername, calComEventSlugs, whatsappNumber, whatsappMessage } = config.integrations
   const calLink = `${calComUsername}/${calComEventSlugs[selected]}`
   const waUrl = buildWhatsAppUrl(whatsappNumber ?? '', whatsappMessage)
+  const bookingOptions = buildBookingOptions(config)
+  const selectedOption = bookingOptions.find((o) => o.key === selected)
 
   useEffect(() => {
-    getCalApi({ namespace: calLink }).then((cal) => {
+    const el = calContainerRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setCalVisible(true)
+          observer.disconnect()
+        }
+      },
+      { root: null, threshold: 0.15 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!calVisible) return
+    let cancelled = false
+    ;(async () => {
+      const mod = await import('@calcom/embed-react')
+      const cal = await mod.getCalApi({ namespace: calLink })
+      if (cancelled) return
       cal('ui', {
         theme: 'light',
         cssVarsPerTheme: {
@@ -34,8 +58,9 @@ export function BookingSection({ config }: { config: ClientConfig }) {
         layout: 'month_view',
       })
       setCalReady(true)
-    })
-  }, [calLink])
+    })()
+    return () => { cancelled = true }
+  }, [calLink, calVisible])
 
   return (
     <section id="programare" className="py-24 px-6 lg:px-10 bg-ink">
@@ -56,7 +81,7 @@ export function BookingSection({ config }: { config: ClientConfig }) {
 
             {/* Event type selector */}
             <div className="space-y-3 mb-10">
-              {EVENT_OPTIONS.map((opt) => (
+              {bookingOptions.map((opt) => (
                 <button
                   key={opt.key}
                   onClick={() => setSelected(opt.key)}
@@ -120,32 +145,39 @@ export function BookingSection({ config }: { config: ClientConfig }) {
           <div className="bg-white rounded-2xl overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.35)]">
             <div className="px-6 pt-6 pb-4 border-b border-sage-l/30">
               <h3 className="font-serif text-xl font-medium text-ink">
-                {EVENT_OPTIONS.find(e => e.key === selected)?.label}
+                {selectedOption?.label}
               </h3>
               <p className="text-sm text-ink-l mt-1">
-                {EVENT_OPTIONS.find(e => e.key === selected)?.note} · {config.address.sector} sau online
+                {selectedOption?.note} · {config.address.sector} sau online
+              </p>
+              <p className="text-xs text-ink-xl mt-2">
+                Durata exactă este setată în Cal.com.
               </p>
             </div>
 
             {/* Cal.com embed */}
-            <div className="relative min-h-[500px]">
-              {!calReady && (
+            <div ref={calContainerRef} className="relative min-h-[500px]">
+              {(!calVisible || !calReady) && (
                 <div className="absolute inset-0 flex items-center justify-center bg-sage-xl">
                   <div className="text-center text-sage-d">
                     <div className="text-3xl mb-3 animate-pulse">📅</div>
-                    <p className="text-sm font-medium">Se încarcă calendarul...</p>
+                    <p className="text-sm font-medium">
+                      {calVisible ? 'Se încarcă calendarul...' : 'Calendarul se va încărca când ajungi aici'}
+                    </p>
                   </div>
                 </div>
               )}
-              <Cal
-                namespace={calLink}
-                calLink={calLink}
-                style={{ width: '100%', height: '100%', minHeight: '500px', overflow: 'scroll' }}
-                config={{
-                  layout: 'month_view',
-                  theme: 'light',
-                }}
-              />
+              {calVisible && (
+                <CalEmbed
+                  namespace={calLink}
+                  calLink={calLink}
+                  style={{ width: '100%', height: '100%', minHeight: '500px', overflow: 'scroll' }}
+                  config={{
+                    layout: 'month_view',
+                    theme: 'light',
+                  }}
+                />
+              )}
             </div>
 
             <div className="px-6 py-4 bg-sage-l/40 border-t border-sage-l/30 flex items-center gap-2">

@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Prevent Next from choosing a wrong workspace root when multiple lockfiles exist.
+  outputFileTracingRoot: __dirname,
   async headers() {
     return [
       {
@@ -21,6 +23,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
     formats: ['image/avif', 'image/webp'],
+    // Prefer stronger caching for remote optimized images (helps LCP when hero is remote).
+    minimumCacheTTL: 60 * 60 * 24 * 7,
   },
   compress: true,
 }

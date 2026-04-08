@@ -31,9 +31,6 @@
 }
 
 @layer utilities {
-  .font-serif { font-family: var(--font-serif), Georgia, serif; }
-  .font-sans  { font-family: var(--font-sans), system-ui, sans-serif; }
-
   /* Custom scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: var(--cream); }
@@ -41,19 +38,9 @@
   ::-webkit-scrollbar-thumb:hover { background: var(--sage); }
 }
 
-/* Animations */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
-}
-
-.animate-fade-up {
-  animation: fadeUp 0.5s ease forwards;
 }
 
 /* Cal.com embed overrides */

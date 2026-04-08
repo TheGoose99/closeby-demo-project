@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { verifyCalWebhookSignature, parseCalWebhookPayload, getReviewEmailDelay } from '@/lib/services/calcom'
 import { sendConfirmationEmail, sendReminderEmail, sendReviewRequestEmail } from '@/lib/services/resend'
+import clientConfig from '@/config/client'
+import { buildPublicBaseUrl, qstashPublishJSON } from '@/lib/services/qstash'
 
 const WEBHOOK_SECRET = process.env.CAL_WEBHOOK_SECRET ?? ''
 
@@ -17,7 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
-    const body = JSON.parse(rawBody)
+    let body: unknown
+    try {
+      body = JSON.parse(rawBody)
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    }
     const event = parseCalWebhookPayload(body)
 
     if (!event) {
@@ -36,11 +43,18 @@ export async function POST(req: NextRequest) {
     switch (triggerEvent) {
       case 'BOOKING_CREATED':
         await sendConfirmationEmail(payload)
-        // Schedule 24h reminder (in production: use a queue like Upstash QStash)
-        // For demo: fire-and-forget with setTimeout
-        const reminderDelay = new Date(payload.startTime).getTime() - Date.now() - 24 * 3600 * 1000
-        if (reminderDelay > 0) {
-          setTimeout(() => sendReminderEmail(payload), reminderDelay)
+        // Schedule 24h reminder using QStash (durable scheduling on Vercel)
+        const reminderDelayMs = new Date(payload.startTime).getTime() - Date.now() - 24 * 3600 * 1000
+        if (reminderDelayMs > 0 && process.env.QSTASH_TOKEN) {
+          const baseUrl = buildPublicBaseUrl(clientConfig.website)
+          await qstashPublishJSON({
+            url: `${baseUrl}/api/jobs/send-reminder`,
+            body: payload,
+            delayMs: reminderDelayMs,
+          })
+        } else if (reminderDelayMs > 0) {
+          // Fallback (demo/dev): best-effort in-process timer
+          setTimeout(() => sendReminderEmail(payload), reminderDelayMs)
         }
         break
 
@@ -54,8 +68,17 @@ export async function POST(req: NextRequest) {
 
       default:
         // BOOKING_CONFIRMED or other — schedule review request after session ends
-        const reviewDelay = getReviewEmailDelay(payload.endTime)
-        setTimeout(() => sendReviewRequestEmail(payload), reviewDelay)
+        const reviewDelayMs = getReviewEmailDelay(payload.endTime)
+        if (reviewDelayMs > 0 && process.env.QSTASH_TOKEN) {
+          const baseUrl = buildPublicBaseUrl(clientConfig.website)
+          await qstashPublishJSON({
+            url: `${baseUrl}/api/jobs/send-review-request`,
+            body: payload,
+            delayMs: reviewDelayMs,
+          })
+        } else {
+          setTimeout(() => sendReviewRequestEmail(payload), reviewDelayMs)
+        }
     }
 
     return NextResponse.json({ ok: true, event: triggerEvent })

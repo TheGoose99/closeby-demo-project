@@ -47,10 +47,11 @@ export const demoConfig: ClientConfig = {
   integrations: {
     calComUsername: 'marian-potoroaca-o5t1s6',
     calComEventSlugs: {
-      initial: '15min',
-      session: '30min',
-      couple:  '30min',
+      initial: 'consultatie-initiala',
+      session: 'sedinta-individuala',
+      couple:  'terapie-cuplu',
     },
+    // TODO (pre-deploy): replace with real Place ID for this address.
     googlePlaceId: 'ChIJxxxxxxxxxxxxxxxxx',
     whatsappNumber: '40722000000',
     whatsappMessage: 'Bună ziua, doresc să fac o programare.',

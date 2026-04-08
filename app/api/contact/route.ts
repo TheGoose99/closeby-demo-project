@@ -1,10 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
 import clientConfig from '@/config/client'
+import { Resend } from 'resend'
+import { createElement } from 'react'
+import { renderEmail } from '@/lib/email/render'
+import { getFromAddress } from '@/lib/email/utils'
+import { ContactEmailToTherapist } from '@/lib/email/templates/ContactEmailToTherapist'
+import { ContactAutoReplyEmail } from '@/lib/email/templates/ContactAutoReplyEmail'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
-  if (!key) throw new Error("RESEND_API_KEY is not set")
+  if (!key) throw new Error('RESEND_API_KEY is not set')
   return new Resend(key)
 }
 
@@ -35,41 +40,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Adresă de email invalidă.' }, { status: 400 })
     }
 
+    const from = getFromAddress(clientConfig)
+
     // Send to therapist
+    const toTherapist = await renderEmail(
+      createElement(ContactEmailToTherapist, {
+        name,
+        email,
+        message,
+        config: { shortName: clientConfig.shortName, gdpr: clientConfig.gdpr },
+      })
+    )
     await getResend().emails.send({
-      from: `Site Cabinet <noreply@${new URL(clientConfig.website).host}>`,
+      from,
       to: clientConfig.email,
       replyTo: email,
       subject: `Mesaj nou de la ${name} — Cabinet ${clientConfig.shortName}`,
-      html: `
-        <h2>Mesaj nou de pe site</h2>
-        <p><strong>Nume:</strong> ${name}</p>
-        <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
-        <p><strong>Mesaj:</strong></p>
-        <p>${message.replace(/\n/g, '<br>')}</p>
-        <hr>
-        <p style="font-size:12px;color:#999">
-          Consimțământ GDPR: Da ·
-          Procesat de ${clientConfig.gdpr.dataProcessorName} ·
-          Servere ${clientConfig.gdpr.serverLocation}
-        </p>
-      `,
+      html: toTherapist.html,
+      text: toTherapist.text,
     })
 
     // Send confirmation to sender
+    const autoReply = await renderEmail(
+      createElement(ContactAutoReplyEmail, {
+        name,
+        config: {
+          shortName: clientConfig.shortName,
+          address: clientConfig.address,
+          phoneDisplay: clientConfig.phoneDisplay,
+          gdpr: clientConfig.gdpr,
+        },
+      })
+    )
     await getResend().emails.send({
-      from: `${clientConfig.shortName} <noreply@${new URL(clientConfig.website).host}>`,
+      from,
       to: email,
       subject: `Am primit mesajul tău — ${clientConfig.shortName}`,
-      html: `
-        <p>Bună ziua, ${name},</p>
-        <p>Am primit mesajul tău și voi reveni cu un răspuns în maxim 24 de ore.</p>
-        <p>Cu respect,<br>${clientConfig.shortName}</p>
-        <p style="font-size:12px;color:#999">
-          ${clientConfig.address.street}, ${clientConfig.address.sector}, ${clientConfig.address.city} ·
-          ${clientConfig.phoneDisplay}
-        </p>
-      `,
+      html: autoReply.html,
+      text: autoReply.text,
     })
 
     return NextResponse.json({ ok: true })

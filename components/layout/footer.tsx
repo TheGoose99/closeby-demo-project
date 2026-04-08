@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { ClientConfig } from '@/types/client-config'
 import { buildWhatsAppUrl } from '@/lib/utils'
+import { CookiePreferencesButton } from '@/components/ui/cookie-preferences-button'
 
 const NAV_LINKS = [
   { href: '#despre', label: 'Despre mine' },
@@ -58,6 +59,7 @@ export function Footer({ config }: { config: ClientConfig }) {
               <Link href="/termeni" className="block text-xs hover:text-sage transition-colors">
                 Termeni și condiții
               </Link>
+              <CookiePreferencesButton className="block text-left text-xs hover:text-sage transition-colors" />
             </div>
           </div>
         </div>
