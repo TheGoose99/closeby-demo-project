@@ -29,3 +29,7 @@ yarn-debug.log*
 .vercel
 .cursor
 planning/
+
+# test folders
+test-results/
+tests-e2e/

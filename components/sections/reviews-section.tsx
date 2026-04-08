@@ -2,6 +2,11 @@ import type { ClientConfig } from '@/types/client-config'
 import { cn } from '@/lib/utils'
 
 export function ReviewsSection({ config }: { config: ClientConfig }) {
+  const hasRealReviewLink =
+    !!config.integrations.reviewLink &&
+    !config.integrations.reviewLink.includes('XXXXX') &&
+    !config.integrations.reviewLink.includes('xxxx')
+
   return (
     <section id="recenzii" className="py-24 px-6 lg:px-10 bg-white overflow-hidden">
       <div className="max-w-[1200px] mx-auto">
@@ -10,15 +15,17 @@ export function ReviewsSection({ config }: { config: ClientConfig }) {
           <h2 className="font-serif text-4xl md:text-5xl font-medium text-ink mt-3 mb-4">
             {config.content.reviewsTitle}
           </h2>
-          <a
-            href={config.integrations.reviewLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-white border border-sage-l/40 rounded-full px-4 py-2 text-sm text-ink-m font-medium hover:border-sage-d transition-colors"
-          >
-            <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 via-green-500 to-yellow-400" />
-            {config.aggregateRating.ratingValue} din 5 · {config.aggregateRating.reviewCount} recenzii Google
-          </a>
+          {hasRealReviewLink && (
+            <a
+              href={config.integrations.reviewLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-white border border-sage-l/40 rounded-full px-4 py-2 text-sm text-ink-m font-medium hover:border-sage-d transition-colors"
+            >
+              <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 via-green-500 to-yellow-400" />
+              {config.aggregateRating.ratingValue} din 5 · {config.aggregateRating.reviewCount} recenzii Google
+            </a>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

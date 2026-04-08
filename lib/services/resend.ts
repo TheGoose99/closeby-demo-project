@@ -66,7 +66,10 @@ export async function sendReminderEmail(booking: CalBookingData) {
 export async function sendReviewRequestEmail(booking: CalBookingData) {
   const attendee = booking.attendees[0]
   if (!attendee) throw new Error(`No attendee in booking ${booking.uid}`)
-  if (!clientConfig.integrations.reviewLink) return
+  const reviewLink = clientConfig.integrations.reviewLink
+  if (!reviewLink) return
+  // Guard against placeholder links in demo configs.
+  if (reviewLink.includes('XXXXX') || reviewLink.includes('xxxx')) return
 
   const { html, text } = await renderEmail(
     createElement(ReviewRequestEmail, {

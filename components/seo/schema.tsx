@@ -22,7 +22,7 @@ export function SchemaLocalBusiness({ config }: { config: ClientConfig }) {
     description: config.seo.metaDescription,
     url: config.website,
 
-    // Specializare medicală
+    // Specializare medicală (keep broad; Cal.com is source of booking data)
     medicalSpecialty: 'Psychiatry',
 
     // Contact
@@ -129,8 +129,9 @@ export function SchemaLocalBusiness({ config }: { config: ClientConfig }) {
         position: i + 1,
         name: s.title,
         description: s.description,
-        price: s.price ?? 0,
-        priceCurrency: s.currency,
+        ...(typeof s.price === 'number'
+          ? { price: s.price, priceCurrency: s.currency }
+          : {}),
         availability: 'https://schema.org/InStock',
         itemOffered: {
           '@type': 'MedicalTherapy',
