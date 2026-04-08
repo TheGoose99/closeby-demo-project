@@ -30,6 +30,12 @@ yarn-debug.log*
 .cursor
 planning/
 
+# client images must live in public/
+config/clients/**/*.jpg
+config/clients/**/*.jpeg
+config/clients/**/*.png
+config/clients/**/*.webp
+
 # test folders
 test-results/
 tests-e2e/

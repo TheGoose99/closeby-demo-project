@@ -3,6 +3,7 @@ import clientConfig from '@/config/client'
 import { HeroSection } from '@/components/sections/hero-section'
 import { ProofStrip } from '@/components/sections/proof-strip'
 import { AboutSection } from '@/components/sections/about-section'
+import { GallerySection } from '@/components/sections/gallery-section'
 import { ServicesSection } from '@/components/sections/services-section'
 import { ReviewsSection } from '@/components/sections/reviews-section'
 import { BookingSection } from '@/components/sections/booking-section'
@@ -45,6 +46,7 @@ export default function HomePage() {
       <HeroSection config={clientConfig} />
       <ProofStrip config={clientConfig} />
       <AboutSection config={clientConfig} />
+      <GallerySection config={clientConfig} />
 
       {/* Internal linking hub — semnale puternice de relevanta topica */}
       <section className="py-16 px-6 lg:px-10 bg-sage-xl">
