@@ -12,14 +12,28 @@ const WEBHOOK_SECRET = process.env.CAL_WEBHOOK_SECRET ?? ''
 // Simple in-memory idempotency (use Redis/KV in production)
 const processed = new Set<string>()
 
+const DEBUG_LOG_URL =
+  process.env.NODE_ENV === 'production'
+    ? process.env.DEBUG_LOG_INGEST_URL
+    : (process.env.DEBUG_LOG_INGEST_URL ?? 'http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6')
+const DEBUG_SESSION_ID = process.env.DEBUG_LOG_SESSION_ID ?? '351dd2'
+
+function debugLog(payload: Record<string, unknown>) {
+  if (!DEBUG_LOG_URL) return
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (DEBUG_SESSION_ID) headers['X-Debug-Session-Id'] = DEBUG_SESSION_ID
+  fetch(DEBUG_LOG_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  }).catch(() => {})
+}
+
 export async function POST(req: NextRequest) {
   try {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
-      body: JSON.stringify({
-        sessionId: '351dd2',
+    debugLog({
+      sessionId: DEBUG_SESSION_ID,
         runId: 'pre-fix',
         hypothesisId: 'H_entry',
         location: 'app/api/webhooks/cal/route.ts:POST:entry',
@@ -31,8 +45,7 @@ export async function POST(req: NextRequest) {
           hasCalApiKey: !!process.env.CAL_API_KEY,
         },
         timestamp: Date.now(),
-      }),
-    }).catch(() => {})
+    })
     // #endregion agent log
 
     const rawBody = await req.text()
@@ -42,19 +55,15 @@ export async function POST(req: NextRequest) {
     if (WEBHOOK_SECRET) {
       const ok = verifyCalWebhookSignature(rawBody, signature, WEBHOOK_SECRET)
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
-        body: JSON.stringify({
-          sessionId: '351dd2',
+      debugLog({
+        sessionId: DEBUG_SESSION_ID,
           runId: 'pre-fix',
           hypothesisId: 'H_sig',
           location: 'app/api/webhooks/cal/route.ts:POST:signature-check',
           message: 'signature verification result',
           data: { ok, hasSignatureHeader: !!signature, rawBodyLength: rawBody.length },
           timestamp: Date.now(),
-        }),
-      }).catch(() => {})
+      })
       // #endregion agent log
       if (!ok) {
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
@@ -77,11 +86,8 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = `${triggerEvent}:${payload.uid}`
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
-      body: JSON.stringify({
-        sessionId: '351dd2',
+    debugLog({
+      sessionId: DEBUG_SESSION_ID,
         runId: 'pre-fix',
         hypothesisId: 'H_event',
         location: 'app/api/webhooks/cal/route.ts:POST:after-parse',
@@ -94,8 +100,7 @@ export async function POST(req: NextRequest) {
           hasAttendeePhone: !!(payload as any)?.attendees?.[0]?.phoneNumber,
         },
         timestamp: Date.now(),
-      }),
-    }).catch(() => {})
+    })
     // #endregion agent log
 
     // Prevent duplicate processing
@@ -114,38 +119,30 @@ export async function POST(req: NextRequest) {
           ttlSeconds: 48 * 60 * 60,
         })
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
-          body: JSON.stringify({
-            sessionId: '351dd2',
+        debugLog({
+          sessionId: DEBUG_SESSION_ID,
             runId: 'pre-fix',
             hypothesisId: 'H_idempotency',
             location: 'app/api/webhooks/cal/route.ts:POST:durable-idempotency',
             message: 'durable idempotency SET NX attempted',
             data: { firstTime },
             timestamp: Date.now(),
-          }),
-        }).catch(() => {})
+        })
         // #endregion agent log
         if (!firstTime) {
           return NextResponse.json({ ok: true, duplicate: true, durable: true })
         }
       } catch (e) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
-          body: JSON.stringify({
-            sessionId: '351dd2',
+        debugLog({
+          sessionId: DEBUG_SESSION_ID,
             runId: 'pre-fix',
             hypothesisId: 'H_upstash',
             location: 'app/api/webhooks/cal/route.ts:POST:durable-idempotency',
             message: 'Upstash durable idempotency failed',
             data: { error: e instanceof Error ? e.message : String(e) },
             timestamp: Date.now(),
-          }),
-        }).catch(() => {})
+        })
         // #endregion agent log
         // Fail open in Phase 1: don't 500 the webhook if Upstash is down/misconfigured.
       }
@@ -157,11 +154,8 @@ export async function POST(req: NextRequest) {
         // Phone lock (Phase 1): best-effort spam protection; requires Upstash + Cal API key.
         const phone = extractPhoneFromCalPayload(payload)
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
-          body: JSON.stringify({
-            sessionId: '351dd2',
+        debugLog({
+          sessionId: DEBUG_SESSION_ID,
             runId: 'pre-fix',
             hypothesisId: 'H_phone',
             location: 'app/api/webhooks/cal/route.ts:POST:phone-extract',
@@ -171,8 +165,7 @@ export async function POST(req: NextRequest) {
               phoneSuffix: phone ? phone.slice(-4) : null,
             },
             timestamp: Date.now(),
-          }),
-        }).catch(() => {})
+        })
         // #endregion agent log
         if (phone && process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
           const lockKey = `lock:phone:${phone}`
@@ -185,35 +178,27 @@ export async function POST(req: NextRequest) {
             })
           } catch (e) {
             // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
-              body: JSON.stringify({
-                sessionId: '351dd2',
+            debugLog({
+              sessionId: DEBUG_SESSION_ID,
                 runId: 'pre-fix',
                 hypothesisId: 'H_upstash',
                 location: 'app/api/webhooks/cal/route.ts:POST:phone-lock',
                 message: 'Upstash phone lock failed',
                 data: { error: e instanceof Error ? e.message : String(e) },
                 timestamp: Date.now(),
-              }),
-            }).catch(() => {})
+            })
             // #endregion agent log
           }
           // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
-            body: JSON.stringify({
-              sessionId: '351dd2',
+          debugLog({
+            sessionId: DEBUG_SESSION_ID,
               runId: 'pre-fix',
               hypothesisId: 'H_lock',
               location: 'app/api/webhooks/cal/route.ts:POST:phone-lock',
               message: 'phone lock SET NX attempted',
               data: { acquired },
               timestamp: Date.now(),
-            }),
-          }).catch(() => {})
+          })
           // #endregion agent log
 
           if (acquired === false) {
