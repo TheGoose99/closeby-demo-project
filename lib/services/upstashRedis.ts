@@ -14,15 +14,15 @@ function getUpstashConfig() {
   return { url: url.replace(/\/+$/, ''), token }
 }
 
-async function upstashFetch<T>(path: string, body?: unknown): Promise<T> {
+async function upstashFetch<T>(path: string, init?: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> }): Promise<T> {
   const { url, token } = getUpstashConfig()
   const res = await fetch(`${url}${path}`, {
-    method: 'POST',
+    method: init?.method ?? 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: init?.body,
   })
 
   if (!res.ok) {
@@ -37,13 +37,14 @@ export async function redisSetIfNotExists({ key, value, ttlSeconds }: SetIfNotEx
   if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) throw new Error('redisSetIfNotExists: ttlSeconds must be > 0')
 
   const val = typeof value === 'string' ? value : JSON.stringify(value)
-  const data = await upstashFetch<UpstashResult<number>>('/set', [key, val, 'NX', 'EX', ttlSeconds])
-  return data.result === 1
+  const path = `/set/${encodeURIComponent(key)}/${encodeURIComponent(val)}/NX/EX/${encodeURIComponent(String(ttlSeconds))}`
+  const data = await upstashFetch<UpstashResult<string | null>>(path)
+  return data.result === 'OK'
 }
 
 export async function redisGet(key: string): Promise<string | null> {
   if (!key) throw new Error('redisGet: key is required')
-  const data = await upstashFetch<UpstashResult<string | null>>('/get', [key])
+  const data = await upstashFetch<UpstashResult<string | null>>(`/get/${encodeURIComponent(key)}`)
   return data.result ?? null
 }
 

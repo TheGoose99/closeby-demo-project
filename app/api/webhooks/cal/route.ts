@@ -14,12 +14,51 @@ const processed = new Set<string>()
 
 export async function POST(req: NextRequest) {
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
+      body: JSON.stringify({
+        sessionId: '351dd2',
+        runId: 'pre-fix',
+        hypothesisId: 'H_entry',
+        location: 'app/api/webhooks/cal/route.ts:POST:entry',
+        message: 'cal-webhook hit',
+        data: {
+          hasWebhookSecret: !!WEBHOOK_SECRET,
+          hasUpstashUrl: !!process.env.UPSTASH_REDIS_REST_URL,
+          hasUpstashToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+          hasCalApiKey: !!process.env.CAL_API_KEY,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion agent log
+
     const rawBody = await req.text()
     const signature = req.headers.get('x-cal-signature-256')
 
     // Verify webhook authenticity
-    if (WEBHOOK_SECRET && !verifyCalWebhookSignature(rawBody, signature, WEBHOOK_SECRET)) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    if (WEBHOOK_SECRET) {
+      const ok = verifyCalWebhookSignature(rawBody, signature, WEBHOOK_SECRET)
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
+        body: JSON.stringify({
+          sessionId: '351dd2',
+          runId: 'pre-fix',
+          hypothesisId: 'H_sig',
+          location: 'app/api/webhooks/cal/route.ts:POST:signature-check',
+          message: 'signature verification result',
+          data: { ok, hasSignatureHeader: !!signature, rawBodyLength: rawBody.length },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion agent log
+      if (!ok) {
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+      }
     }
 
     let body: unknown
@@ -37,6 +76,28 @@ export async function POST(req: NextRequest) {
     const { triggerEvent, payload } = event
     const idempotencyKey = `${triggerEvent}:${payload.uid}`
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
+      body: JSON.stringify({
+        sessionId: '351dd2',
+        runId: 'pre-fix',
+        hypothesisId: 'H_event',
+        location: 'app/api/webhooks/cal/route.ts:POST:after-parse',
+        message: 'cal-webhook parsed event',
+        data: {
+          triggerEvent,
+          hasUid: !!payload?.uid,
+          uidSuffix: typeof payload?.uid === 'string' ? payload.uid.slice(-6) : null,
+          hasResponsesPhone: !!(payload as any)?.responses?.attendeePhoneNumber,
+          hasAttendeePhone: !!(payload as any)?.attendees?.[0]?.phoneNumber,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion agent log
+
     // Prevent duplicate processing
     if (processed.has(idempotencyKey)) {
       return NextResponse.json({ ok: true, duplicate: true })
@@ -46,13 +107,47 @@ export async function POST(req: NextRequest) {
     // Durable idempotency (recommended for serverless): only if Upstash is configured.
     if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
       const processedKey = `processed:webhook:${idempotencyKey}`
-      const firstTime = await redisSetIfNotExists({
-        key: processedKey,
-        value: { at: new Date().toISOString() },
-        ttlSeconds: 48 * 60 * 60,
-      })
-      if (!firstTime) {
-        return NextResponse.json({ ok: true, duplicate: true, durable: true })
+      try {
+        const firstTime = await redisSetIfNotExists({
+          key: processedKey,
+          value: { at: new Date().toISOString() },
+          ttlSeconds: 48 * 60 * 60,
+        })
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
+          body: JSON.stringify({
+            sessionId: '351dd2',
+            runId: 'pre-fix',
+            hypothesisId: 'H_idempotency',
+            location: 'app/api/webhooks/cal/route.ts:POST:durable-idempotency',
+            message: 'durable idempotency SET NX attempted',
+            data: { firstTime },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion agent log
+        if (!firstTime) {
+          return NextResponse.json({ ok: true, duplicate: true, durable: true })
+        }
+      } catch (e) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
+          body: JSON.stringify({
+            sessionId: '351dd2',
+            runId: 'pre-fix',
+            hypothesisId: 'H_upstash',
+            location: 'app/api/webhooks/cal/route.ts:POST:durable-idempotency',
+            message: 'Upstash durable idempotency failed',
+            data: { error: e instanceof Error ? e.message : String(e) },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion agent log
+        // Fail open in Phase 1: don't 500 the webhook if Upstash is down/misconfigured.
       }
     }
 
@@ -61,15 +156,67 @@ export async function POST(req: NextRequest) {
       case 'BOOKING_CREATED':
         // Phone lock (Phase 1): best-effort spam protection; requires Upstash + Cal API key.
         const phone = extractPhoneFromCalPayload(payload)
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
+          body: JSON.stringify({
+            sessionId: '351dd2',
+            runId: 'pre-fix',
+            hypothesisId: 'H_phone',
+            location: 'app/api/webhooks/cal/route.ts:POST:phone-extract',
+            message: 'extracted phone for lock',
+            data: {
+              phonePresent: !!phone,
+              phoneSuffix: phone ? phone.slice(-4) : null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion agent log
         if (phone && process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
           const lockKey = `lock:phone:${phone}`
-          const acquired = await redisSetIfNotExists({
-            key: lockKey,
-            value: { uid: payload.uid, createdAt: new Date().toISOString() },
-            ttlSeconds: 24 * 60 * 60,
-          })
+          let acquired: boolean | null = null
+          try {
+            acquired = await redisSetIfNotExists({
+              key: lockKey,
+              value: { uid: payload.uid, createdAt: new Date().toISOString() },
+              ttlSeconds: 24 * 60 * 60,
+            })
+          } catch (e) {
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
+              body: JSON.stringify({
+                sessionId: '351dd2',
+                runId: 'pre-fix',
+                hypothesisId: 'H_upstash',
+                location: 'app/api/webhooks/cal/route.ts:POST:phone-lock',
+                message: 'Upstash phone lock failed',
+                data: { error: e instanceof Error ? e.message : String(e) },
+                timestamp: Date.now(),
+              }),
+            }).catch(() => {})
+            // #endregion agent log
+          }
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/27dfd52d-6f68-4075-94cf-d2f93a4ea8d6', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '351dd2' },
+            body: JSON.stringify({
+              sessionId: '351dd2',
+              runId: 'pre-fix',
+              hypothesisId: 'H_lock',
+              location: 'app/api/webhooks/cal/route.ts:POST:phone-lock',
+              message: 'phone lock SET NX attempted',
+              data: { acquired },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {})
+          // #endregion agent log
 
-          if (!acquired) {
+          if (acquired === false) {
             try {
               if (process.env.CAL_API_KEY) {
                 await declineCalBookingByUid({
