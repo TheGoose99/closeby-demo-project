@@ -31,6 +31,8 @@ function debugLog(payload: Record<string, unknown>) {
 
 export async function POST(req: NextRequest) {
   try {
+    const debugProd = process.env.DEBUG_CAL_WEBHOOK === '1'
+
     // #region agent log
     debugLog({
       sessionId: DEBUG_SESSION_ID,
@@ -54,6 +56,13 @@ export async function POST(req: NextRequest) {
     // Verify webhook authenticity
     if (WEBHOOK_SECRET) {
       const ok = verifyCalWebhookSignature(rawBody, signature, WEBHOOK_SECRET)
+      if (debugProd) {
+        console.log('[cal-webhook][dbg] signature', {
+          ok,
+          hasSignatureHeader: !!signature,
+          rawBodyLength: rawBody.length,
+        })
+      }
       // #region agent log
       debugLog({
         sessionId: DEBUG_SESSION_ID,
@@ -90,6 +99,17 @@ export async function POST(req: NextRequest) {
       attendees?: Array<{ phoneNumber?: string }>
     }
 
+    if (debugProd) {
+      console.log('[cal-webhook][dbg] parsed', {
+        triggerEvent,
+        uidSuffix: typeof payload?.uid === 'string' ? payload.uid.slice(-6) : null,
+        hasResponsesPhone: !!payloadAny.responses?.attendeePhoneNumber,
+        hasAttendeePhone: !!payloadAny.attendees?.[0]?.phoneNumber,
+        hasUpstash: !!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN,
+        hasCalApiKey: !!process.env.CAL_API_KEY,
+      })
+    }
+
     // #region agent log
     debugLog({
       sessionId: DEBUG_SESSION_ID,
@@ -123,6 +143,7 @@ export async function POST(req: NextRequest) {
           value: { at: new Date().toISOString() },
           ttlSeconds: 48 * 60 * 60,
         })
+        if (debugProd) console.log('[cal-webhook][dbg] durable-idempotency', { firstTime })
         // #region agent log
         debugLog({
           sessionId: DEBUG_SESSION_ID,
@@ -138,6 +159,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: true, duplicate: true, durable: true })
         }
       } catch (e) {
+        if (debugProd) console.log('[cal-webhook][dbg] durable-idempotency error', { error: e instanceof Error ? e.message : String(e) })
         // #region agent log
         debugLog({
           sessionId: DEBUG_SESSION_ID,
@@ -158,6 +180,7 @@ export async function POST(req: NextRequest) {
       case 'BOOKING_CREATED':
         // Phone lock (Phase 1): best-effort spam protection; requires Upstash + Cal API key.
         const phone = extractPhoneFromCalPayload(payload)
+        if (debugProd) console.log('[cal-webhook][dbg] phone', { phonePresent: !!phone, phoneSuffix: phone ? phone.slice(-4) : null })
         // #region agent log
         debugLog({
           sessionId: DEBUG_SESSION_ID,
@@ -182,6 +205,7 @@ export async function POST(req: NextRequest) {
               ttlSeconds: 24 * 60 * 60,
             })
           } catch (e) {
+            if (debugProd) console.log('[cal-webhook][dbg] phone-lock error', { error: e instanceof Error ? e.message : String(e) })
             // #region agent log
             debugLog({
               sessionId: DEBUG_SESSION_ID,
@@ -194,6 +218,7 @@ export async function POST(req: NextRequest) {
             })
             // #endregion agent log
           }
+          if (debugProd) console.log('[cal-webhook][dbg] phone-lock', { acquired })
           // #region agent log
           debugLog({
             sessionId: DEBUG_SESSION_ID,
@@ -209,10 +234,12 @@ export async function POST(req: NextRequest) {
           if (acquired === false) {
             try {
               if (process.env.CAL_API_KEY) {
+                if (debugProd) console.log('[cal-webhook][dbg] declining booking', { uidSuffix: String(payload.uid).slice(-6) })
                 await declineCalBookingByUid({
                   bookingUid: payload.uid,
                   reason: 'Duplicate booking request (phone locked for 24h)',
                 })
+                if (debugProd) console.log('[cal-webhook][dbg] declined booking ok', { uidSuffix: String(payload.uid).slice(-6) })
               } else {
                 console.warn('[cal-webhook] Duplicate phone lock but CAL_API_KEY missing; cannot auto-decline', {
                   phone,
