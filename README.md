@@ -68,6 +68,25 @@ cp .env.local.example .env.local
 # Editează .env.local cu cheile tale reale
 ```
 
+### 2.1 Firebase — verificare telefon (SMS OTP) înainte de Cal
+
+Booking-ul cere un SMS OTP prin **Firebase Authentication**, apoi serverul verifică `idToken`-ul cu **Firebase Admin** și abia apoi aplică lock-ul Redis existent.
+
+Checklist minim:
+
+1. Firebase Console → Authentication → Sign-in method → enable **Phone**
+2. Firebase Console → Project settings → Your apps → Web app → copiază valorile în `.env.local`:
+   - `NEXT_PUBLIC_FIREBASE_API_KEY`
+   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+   - `NEXT_PUBLIC_FIREBASE_APP_ID` (opțional dar recomandat)
+3. Firebase Console → Project settings → Service accounts → **Generate new private key**
+   - setează `FIREBASE_SERVICE_ACCOUNT_JSON` ca JSON pe **o singură linie** în `.env.local` (Vercel-friendly)
+4. Authentication → Settings → **Authorized domains**: adaugă domeniul de producție + `localhost` pentru dev
+5. Local dev notes:
+   - reCAPTCHA poate fi sensibil la adblock / incognito
+   - dacă `CLIENT_SLUG` este setat în env, UI trimite `clientSlug` la server; serverul refuză mismatch-ul
+
 ### 3. Rulează local
 
 ```bash

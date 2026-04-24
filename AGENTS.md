@@ -23,3 +23,32 @@
 - Standard local webhook testing: folosești ngrok pe port 3000 (URL public) pentru a putea primi webhooks Cal.com local. Vezi `README.md` → “Local dev (webhook public via ngrok)”.
 - TDD enforcement (medium/high tasks): pentru modificări cu impact pe booking/email/webhooks/SEO/config model/critical path UI, adaugi unit tests (preferabil TDD) și nu marchezi “done” până nu trec: `npx tsc --noEmit`, `npm run lint`, și testele.
 <!-- END:nextjs-agent-rules -->
+
+## Revenue-First Operating Rules (User Mandate)
+
+- Default to **Phase 1 (0-5 clients)** unless user explicitly switches phase.
+- Always evaluate: **"Does this help generate revenue or validate quickly?"**
+  - If yes: proceed fast.
+  - If no: mark as **FUTURE**.
+- Prioritize speed and execution over perfection.
+- Keep solutions minimal: simple > scalable, manual > automated (early stage).
+- Avoid early infra complexity (microservices, heavy DevOps, over-architecture).
+- Prefer EU-first/GDPR-safe defaults for hosting/data when relevant.
+- Optimize for psychologists as non-technical users: clarity and simplicity first.
+
+### Response Style
+
+- Keep responses concise.
+- Default structure:
+  1. Answer
+  2. Brief reasoning
+  3. Implementation
+
+### Mode Contracts
+
+- `PLAN`: no code; output goal, approach, max 7 steps, risks, decision.
+- `EXECUTE`: implement directly; minimal theory.
+- `REVIEW`: classify KEEP / MODIFY / DELAY with short reason.
+- `DEBUG`: root cause + minimal fix.
+- `JIRA`: tasks grouped by MVP / Scraping / Automation with HIGH / MEDIUM / LOW.
+- `SCRAPER`: prefer Node.js scripts; include structure, extraction logic, CSV/JSON export.

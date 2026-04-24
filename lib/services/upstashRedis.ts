@@ -6,6 +6,12 @@ type SetIfNotExistsOpts = {
 
 type UpstashResult<T> = { result: T }
 
+export function hasUpstashRedisEnv(): boolean {
+  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN
+  return Boolean(url && token)
+}
+
 function getUpstashConfig() {
   const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN
@@ -46,5 +52,30 @@ export async function redisGet(key: string): Promise<string | null> {
   if (!key) throw new Error('redisGet: key is required')
   const data = await upstashFetch<UpstashResult<string | null>>(`/get/${encodeURIComponent(key)}`)
   return data.result ?? null
+}
+
+type UpstashPipelineItem<T> = { result?: T; error?: string }
+
+export async function redisMultiExec<T = unknown>(commands: unknown[][]): Promise<UpstashPipelineItem<T>[]> {
+  if (!Array.isArray(commands) || commands.length === 0) {
+    throw new Error('redisMultiExec: commands must be a non-empty array')
+  }
+
+  const { url, token } = getUpstashConfig()
+  const res = await fetch(`${url}/multi-exec`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(commands),
+  })
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Upstash multi-exec failed (${res.status}): ${text}`)
+  }
+
+  return (await res.json()) as UpstashPipelineItem<T>[]
 }
 
