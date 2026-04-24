@@ -44,14 +44,15 @@ export const demoConfig: ClientConfig = {
   openingHoursDisplay: 'Luni-Vineri: 09:00-18:00',
 
   integrations: {
-    calComUsername: 'marian-potoroaca-o5t1s6',
-    // Canonical slugs (used by automation across projects)
+    // Fallback-only defaults. Source of truth should be env/tenant data.
+    calComUsername: 'demo-cal-username',
+    // Canonical slugs are expected to be generated/provisioned per client.
     calComCanonicalEventSlugs: {
       initial: 'consultatie-initiala',
       session: 'sedinta-individuala',
       couple:  'terapie-cuplu',
     },
-    // Demo/legacy override: this Cal account only has default event slugs.
+    // Optional legacy override (fallback-only).
     calComEventSlugs: {
       initial: '15min',
       session: '30min',

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import clientConfig from '@/config/client'
+import { getMergedClientConfig } from '@/lib/integrations/getMergedClientConfig'
+import { ClientConfigProvider } from '@/components/providers/client-config-provider'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { MobileBar } from '@/components/layout/mobile-bar'
@@ -63,21 +65,24 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const mergedConfig = await getMergedClientConfig()
   return (
     <html lang="ro">
       <head>
         {/* Schema.org sitewide */}
-        <SchemaLocalBusiness config={clientConfig} />
-        <SchemaPerson config={clientConfig} />
-        <SchemaWebSite config={clientConfig} />
+        <SchemaLocalBusiness config={mergedConfig} />
+        <SchemaPerson config={mergedConfig} />
+        <SchemaWebSite config={mergedConfig} />
       </head>
       <body className={`${fontSerif.variable} ${fontSans.variable} font-sans bg-cream text-ink antialiased pb-24 md:pb-0`}>
-        <Header config={clientConfig} />
-        <main>{children}</main>
-        <Footer config={clientConfig} />
-        <MobileBar config={clientConfig} />
-        <CookieBanner config={clientConfig} />
+        <ClientConfigProvider value={mergedConfig}>
+          <Header config={mergedConfig} />
+          <main>{children}</main>
+          <Footer config={mergedConfig} />
+          <MobileBar config={mergedConfig} />
+          <CookieBanner config={mergedConfig} />
+        </ClientConfigProvider>
       </body>
     </html>
   )

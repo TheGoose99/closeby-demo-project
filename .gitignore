@@ -39,3 +39,6 @@ config/clients/**/*.webp
 # test folders
 test-results/
 tests-e2e/
+
+# documentation folders
+documentation/

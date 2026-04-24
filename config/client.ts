@@ -1,14 +1,10 @@
-import { demoConfig } from './clients/demo'
-import type { ClientConfig } from '@/types/client-config'
+import { applyPublicIntegrationEnvOverrides } from './apply-env-integrations'
+import { loadBaseClientConfig } from './load-base-client'
 
-// In production: read CLIENT_SLUG env var to select the right client
-const CLIENT_SLUG = process.env.CLIENT_SLUG ?? 'demo'
-
-const configs: Record<string, ClientConfig> = {
-  demo: demoConfig,
-  // 'client-001': client001Config,  ← add new clients here
-}
-
-export const clientConfig: ClientConfig = configs[CLIENT_SLUG] ?? demoConfig
+/**
+ * Sync client config: static `config/clients/*` plus **public** Cal overrides from `NEXT_PUBLIC_CAL_COM_*`.
+ * For metadata and code paths that cannot await DB. Booking UI uses `getMergedClientConfig()` (DB overlay).
+ */
+export const clientConfig = applyPublicIntegrationEnvOverrides(loadBaseClientConfig())
 
 export default clientConfig

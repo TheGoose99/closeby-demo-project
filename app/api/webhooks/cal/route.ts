@@ -6,8 +6,7 @@ import { buildPublicBaseUrl, qstashPublishJSON } from '@/lib/services/qstash'
 import { extractPhoneFromCalPayload } from '@/lib/antiAbuse/phone.js'
 import { redisSetIfNotExists } from '@/lib/services/upstashRedis'
 import { declineCalBookingByUid } from '@/lib/services/calApi'
-
-const WEBHOOK_SECRET = process.env.CAL_WEBHOOK_SECRET ?? ''
+import { resolveActiveTenantCalSecrets } from '@/lib/integrations/resolveCalSecrets'
 
 // Simple in-memory idempotency (use Redis/KV in production)
 const processed = new Set<string>()
@@ -31,6 +30,19 @@ function debugLog(payload: Record<string, unknown>) {
 
 export async function POST(req: NextRequest) {
   try {
+    const rawBody = await req.text()
+    const signature = req.headers.get('x-cal-signature-256')
+
+    let body: unknown
+    try {
+      body = JSON.parse(rawBody)
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    }
+
+    const { webhookSecret, apiKey: calApiKey, tenantSource, resolvedClientSlug } =
+      await resolveActiveTenantCalSecrets(body)
+
     const debugProd = process.env.DEBUG_CAL_WEBHOOK === '1'
     const hasRedis =
       (!!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN) ||
@@ -39,41 +51,42 @@ export async function POST(req: NextRequest) {
     // #region agent log
     debugLog({
       sessionId: DEBUG_SESSION_ID,
-        runId: 'pre-fix',
-        hypothesisId: 'H_entry',
-        location: 'app/api/webhooks/cal/route.ts:POST:entry',
-        message: 'cal-webhook hit',
-        data: {
-          hasWebhookSecret: !!WEBHOOK_SECRET,
-          hasRedis,
-          hasCalApiKey: !!process.env.CAL_API_KEY,
-        },
-        timestamp: Date.now(),
+      runId: 'pre-fix',
+      hypothesisId: 'H_entry',
+      location: 'app/api/webhooks/cal/route.ts:POST:entry',
+      message: 'cal-webhook hit',
+      data: {
+        hasWebhookSecret: !!webhookSecret,
+        hasRedis,
+        hasCalApiKey: !!calApiKey,
+        tenantSource,
+        resolvedClientSlug,
+      },
+      timestamp: Date.now(),
     })
     // #endregion agent log
 
-    const rawBody = await req.text()
-    const signature = req.headers.get('x-cal-signature-256')
-
-    // Verify webhook authenticity
-    if (WEBHOOK_SECRET) {
-      const ok = verifyCalWebhookSignature(rawBody, signature, WEBHOOK_SECRET)
+    // Verify webhook authenticity (secret chosen after JSON parse so Cal organizer.username can resolve tenant DB row).
+    if (webhookSecret) {
+      const ok = verifyCalWebhookSignature(rawBody, signature, webhookSecret)
       if (debugProd) {
         console.log('[cal-webhook][dbg] signature', {
           ok,
           hasSignatureHeader: !!signature,
           rawBodyLength: rawBody.length,
+          tenantSource,
+          resolvedClientSlug,
         })
       }
       // #region agent log
       debugLog({
         sessionId: DEBUG_SESSION_ID,
-          runId: 'pre-fix',
-          hypothesisId: 'H_sig',
-          location: 'app/api/webhooks/cal/route.ts:POST:signature-check',
-          message: 'signature verification result',
-          data: { ok, hasSignatureHeader: !!signature, rawBodyLength: rawBody.length },
-          timestamp: Date.now(),
+        runId: 'pre-fix',
+        hypothesisId: 'H_sig',
+        location: 'app/api/webhooks/cal/route.ts:POST:signature-check',
+        message: 'signature verification result',
+        data: { ok, hasSignatureHeader: !!signature, rawBodyLength: rawBody.length },
+        timestamp: Date.now(),
       })
       // #endregion agent log
       if (!ok) {
@@ -81,12 +94,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let body: unknown
-    try {
-      body = JSON.parse(rawBody)
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-    }
     const event = parseCalWebhookPayload(body)
 
     if (!event) {
@@ -108,7 +115,7 @@ export async function POST(req: NextRequest) {
         hasResponsesPhone: !!payloadAny.responses?.attendeePhoneNumber,
         hasAttendeePhone: !!payloadAny.attendees?.[0]?.phoneNumber,
         hasRedis,
-        hasCalApiKey: !!process.env.CAL_API_KEY,
+        hasCalApiKey: !!calApiKey,
       })
     }
 
@@ -235,15 +242,16 @@ export async function POST(req: NextRequest) {
 
           if (acquired === false) {
             try {
-              if (process.env.CAL_API_KEY) {
+              if (calApiKey) {
                 if (debugProd) console.log('[cal-webhook][dbg] declining booking', { uidSuffix: String(payload.uid).slice(-6) })
                 await declineCalBookingByUid({
                   bookingUid: payload.uid,
                   reason: 'Duplicate booking request (phone locked for 24h)',
+                  apiKey: calApiKey,
                 })
                 if (debugProd) console.log('[cal-webhook][dbg] declined booking ok', { uidSuffix: String(payload.uid).slice(-6) })
               } else {
-                console.warn('[cal-webhook] Duplicate phone lock but CAL_API_KEY missing; cannot auto-decline', {
+                console.warn('[cal-webhook] Duplicate phone lock but Cal API key missing; cannot auto-decline', {
                   phone,
                   uid: payload.uid,
                 })

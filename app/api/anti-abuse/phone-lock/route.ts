@@ -1,9 +1,25 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { redisGet } from '@/lib/services/upstashRedis'
 import { normalizePhone } from '@/lib/antiAbuse/phone.js'
+import { acquirePhoneLockServer } from '@/lib/services/phoneLockServer'
+
+function isPublicPhoneLockEnabled() {
+  if (process.env.ENABLE_PUBLIC_PHONE_LOCK_API === '1') return true
+  return process.env.NODE_ENV !== 'production'
+}
+
+function isAuthorized(req: NextRequest) {
+  const expected = process.env.PHONE_LOCK_API_TOKEN?.trim()
+  if (!expected) return false
+  const given = req.headers.get('x-phone-lock-token')?.trim()
+  return given === expected
+}
 
 export async function POST(req: NextRequest) {
   try {
+    if (!isPublicPhoneLockEnabled() && !isAuthorized(req)) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
     const body = await req.json().catch(() => null)
     const phoneRaw = body?.phone
     if (typeof phoneRaw !== 'string') {
@@ -15,20 +31,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone' }, { status: 400 })
     }
 
-    const hasRedis =
-      (!!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN) ||
-      (!!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN)
-
-    // If Redis isn't configured, fail open (Phase 1).
-    if (!hasRedis) {
-      return NextResponse.json({ locked: false, reason: 'no_store' })
-    }
-
-    const key = `lock:phone:${phone}`
-    const value = await redisGet(key)
-    return NextResponse.json({ locked: !!value })
+    const result = await acquirePhoneLockServer(phoneRaw)
+    return NextResponse.json(result, { status: 200 })
   } catch (e) {
-    return NextResponse.json({ locked: false, error: e instanceof Error ? e.message : String(e) }, { status: 200 })
+    return NextResponse.json(
+      { allowed: false, locked: false, error: e instanceof Error ? e.message : String(e) },
+      { status: 200 },
+    )
   }
 }
 

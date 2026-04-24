@@ -60,7 +60,7 @@ export function HeroSection({ config }: { config: ClientConfig }) {
         <div className="relative max-w-sm w-full">
           {/* Morphic blob image container */}
           <div
-            className="overflow-hidden aspect-[3/4] bg-gradient-to-br from-sage-xl to-sage-l"
+            className="relative overflow-hidden aspect-[3/4] bg-gradient-to-br from-sage-xl to-sage-l"
             style={{ borderRadius: '40% 60% 55% 45% / 45% 40% 60% 55%' }}
           >
             {config.images.therapist ? (

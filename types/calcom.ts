@@ -20,7 +20,7 @@ export interface CalBookingData {
   startTime: string
   endTime: string
   attendees: CalAttendee[]
-  organizer: { name: string; email: string; timeZone: string }
+  organizer: { name: string; email: string; timeZone: string; username?: string }
   location?: string
   description?: string
   metadata?: Record<string, string>
