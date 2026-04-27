@@ -91,7 +91,7 @@ Checklist minim:
 
 ```bash
 npm run dev
-# http://localhost:3000
+# http://localhost:8008
 ```
 
 ### 4. Customizează pentru un client nou
@@ -168,7 +168,7 @@ După prima aplicare completă, pentru fișiere noi fără a re-rula 0001–0007
 
 ## Local dev (webhook public via ngrok)
 
-Pentru a testa webhooks Cal.com local, ai nevoie de un URL public către `localhost:3000`.
+Pentru a testa webhooks Cal.com local, ai nevoie de un URL public către `localhost:8008`.
 
 1. Rulează Next local:
 
@@ -176,7 +176,7 @@ Pentru a testa webhooks Cal.com local, ai nevoie de un URL public către `localh
 npm run dev
 ```
 
-2. Pornește ngrok pentru portul 3000 (îți va da un URL public de forma `https://<id>.ngrok-free.app`).
+2. Pornește ngrok pentru portul 8008 (îți va da un URL public de forma `https://<id>.ngrok-free.app`).
 3. Setează în `.env.local`:
    - `NEXT_PUBLIC_SITE_URL=https://<id>.ngrok-free.app`
    - `CAL_WEBHOOK_SECRET=<secretul webhook-ului din Cal.com>` (același secret pe care îl afișează Cal.com pentru webhook)
@@ -192,6 +192,22 @@ Notă: URL-ul ngrok se schimbă. Când se schimbă, actualizezi și `NEXT_PUBLIC
 3. Adaugă DNS records DKIM + SPF + DMARC conform instrucțiunilor Resend
 4. API Keys → Create → copiază în `RESEND_API_KEY`
 5. Verifică deliverability cu **mail-tester.com** (scor țintă: ≥ 9/10)
+
+## Firebase + reCAPTCHA setup (booking anti-abuse)
+
+Firebase keys/secrets are centralized in **seo-data-platform**.
+
+1. Configure Firebase values in `seo-data-platform/.env.local`:
+   - `NEXT_PUBLIC_FIREBASE_API_KEY`
+   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+   - `NEXT_PUBLIC_FIREBASE_APP_ID`
+   - `FIREBASE_SERVICE_ACCOUNT_JSON`
+2. In closeby `.env.local`, set only integration bridge vars:
+   - `SEO_DATA_PLATFORM_URL` (e.g. `http://localhost:3000`)
+   - `INTERNAL_LOCK_API_TOKEN` (must match seo-data-platform token)
+3. BookingSection still performs SMS + reCAPTCHA UX, but closeby obtains Firebase config from `/api/anti-abuse/firebase-config` (proxied to seo-data-platform).
+4. Phone verification and lock-check in closeby are proxied to seo-data-platform internal endpoints (`/api/internal/firebase/verify-phone`, `/api/internal/firebase/phone-lock`).
 
 ## Google Maps Embed
 

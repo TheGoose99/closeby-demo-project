@@ -72,8 +72,8 @@ export interface ClientConfig {
      */
     calComCanonicalEventSlugs: {
       initial: string
-      session: string
-      couple: string
+      session?: string
+      couple?: string
     }
     /**
      * Optional per-client override for legacy/demo Cal.com accounts where event slugs differ.
@@ -81,8 +81,8 @@ export interface ClientConfig {
      */
     calComEventSlugs?: {
       initial: string
-      session: string
-      couple: string
+      session?: string
+      couple?: string
     }
     googlePlaceId?: string
     whatsappNumber?: string

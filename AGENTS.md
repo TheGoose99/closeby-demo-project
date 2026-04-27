@@ -18,6 +18,9 @@
   - După ce modifici `components/providers/client-config-provider.tsx` (sau alte fișiere listate în **`seo-data-platform/scripting/website/closeby/PARITY.md`**), actualizează copia din acel folder înainte de `template:zip`
 - Deploy model: un proiect Vercel per client, același repo, `CLIENT_SLUG` diferit.
 - Webhooks Cal.com: `app/api/webhooks/cal/route.ts` (confirmare + reminder 24h + review request).
+- Booking anti-abuse: accesul la embed Cal.com se face după verificare telefon Firebase + reCAPTCHA.
+- Firebase ownership este în seo-data-platform; closeby nu mai deține cheile Firebase în env local.
+- closeby validează/lock-check prin proxy intern către seo-data-platform (`SEO_DATA_PLATFORM_URL` + `INTERNAL_LOCK_API_TOKEN`).
 - Scheduling emailuri: pentru demo se folosește `setTimeout`, dar pentru producție (Vercel serverless) trebuie queue/job scheduling (ex. QStash) ca să supraviețuiască restarturilor.
 - Pentru setup operațional (Cal.com/Resend/Vercel/DNS) vezi `README.md`.
 - Standard local webhook testing: folosești ngrok pe port 3000 (URL public) pentru a putea primi webhooks Cal.com local. Vezi `README.md` → “Local dev (webhook public via ngrok)”.

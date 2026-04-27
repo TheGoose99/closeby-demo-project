@@ -45,18 +45,12 @@ export const demoConfig: ClientConfig = {
 
   integrations: {
     // Fallback-only defaults. Source of truth should be env/tenant data.
-    calComUsername: 'demo-cal-username',
+    calComUsername: 'gabu-iieqyx',
     // Canonical slugs are expected to be generated/provisioned per client.
     calComCanonicalEventSlugs: {
-      initial: 'consultatie-initiala',
-      session: 'sedinta-individuala',
-      couple:  'terapie-cuplu',
-    },
-    // Optional legacy override (fallback-only).
-    calComEventSlugs: {
-      initial: '15min',
+      initial: '60min',
       session: '30min',
-      couple:  '30min',
+      couple: 'terapie-cuplu',
     },
     // (pre-deploy): set to the real Google Place ID for this cabinet.
     googlePlaceId: undefined,
